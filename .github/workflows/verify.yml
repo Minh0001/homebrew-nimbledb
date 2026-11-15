@@ -1,0 +1,59 @@
+name: Verify Homebrew macOS install
+on:
+  push:
+    paths: ['Casks/**', '.github/workflows/verify.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      HOMEBREW_NO_ANALYTICS: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install public cask through Homebrew
+        run: |
+          brew tap Minh0001/nimbledb
+          brew install --cask Minh0001/nimbledb/nimbledb
+          brew list --cask --versions nimbledb
+          brew info --cask --json=v2 nimbledb > "$RUNNER_TEMP/cask.json"
+      - name: Verify installed bundle and architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, plistlib, subprocess
+          info=json.loads(pathlib.Path(os.environ["RUNNER_TEMP"],"cask.json").read_text())["casks"][0]
+          assert info["version"]=="0.6.0", info
+          bundle=pathlib.Path("/Applications/NimbleDB.app/Contents")
+          plist=plistlib.loads((bundle/"Info.plist").read_bytes())
+          assert plist["CFBundleShortVersionString"]=="0.6.0", plist
+          binary=bundle/"MacOS/NimbleDB"
+          arch=subprocess.check_output(["lipo","-archs",str(binary)],text=True).strip()
+          assert arch==os.environ["EXPECTED_ARCH"], arch
+          subprocess.run(["codesign","--verify","--deep","--strict","/Applications/NimbleDB.app"],check=True)
+          subprocess.run([str(binary),"--self-check"],check=True)
+          print(json.dumps({"version":info["version"],"architecture":arch,"bundle_verified":True}))
+          PY
+      - name: Open installed native GUI
+        run: |
+          NIMBLEDB_SMOKE_REPORT="$RUNNER_TEMP/gui-verification.json" /Applications/NimbleDB.app/Contents/MacOS/NimbleDB
+          cat "$RUNNER_TEMP/gui-verification.json"
+          python3 - <<'PY'
+          import json, os, pathlib
+          result=json.loads(pathlib.Path(os.environ["RUNNER_TEMP"],"gui-verification.json").read_text())
+          assert result["version"]=="0.6.0" and result["gui_frames"]>=3, result
+          PY
+      - name: Uninstall without deleting profiles
+        if: always()
+        run: brew uninstall --cask nimbledb || true
