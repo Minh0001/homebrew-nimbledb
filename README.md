@@ -1,6 +1,14 @@
 # NimbleDB Homebrew tap
 
-Native Rust desktop database client for PostgreSQL, MongoDB, MySQL and Microsoft SQL Server.
+Performance-focused native Rust database client for PostgreSQL, MongoDB, MySQL and Microsoft SQL Server.
+
+[Website](https://minh0001.github.io/homebrew-nimbledb/) · [Performance overview](https://minh0001.github.io/homebrew-nimbledb/#performance)
+
+## Performance-oriented architecture
+
+NimbleDB uses native egui/eframe rendering and Rust database drivers, without bundling Chromium, Node.js or a WebView. Database operations run on background workers; the grid virtualizes visible rows within bounded results, with server-side filtering and paging.
+
+Compared with an Electron-based client, this removes the browser/runtime layers. Lower RAM use, faster startup and lower CPU use remain goals to benchmark, not measured claims. Database execution and network latency are separate from client overhead; Electron clients can also use background workers and virtualization.
 
 ## Install on macOS
 
@@ -35,3 +43,4 @@ Query history stores local plaintext query text and can be disabled or cleared. 
 [Download macOS installers](https://github.com/Minh0001/homebrew-nimbledb/releases/latest)
 
 This repository contains distribution metadata and macOS binaries. The application source is maintained separately.
+
